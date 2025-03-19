@@ -19,6 +19,10 @@ Firstly we load required packages (ggplot2) and define a function that simulates
 
 ```{r setup}
 library(ggplot2)
+library(ggthemes)
+# harmonise look of plots
+theme_set(theme_base(base_size = 12) +
+            theme(plot.background = element_blank()))
 library(latex2exp)
 library(gridExtra)
 
@@ -51,7 +55,8 @@ sis_tray_sim=function(dt=0.1,MaxTime=10000,N0=400,T0=0,probtrans=1/15,
  # DeltaP <- rbinom(n=length(TC),prob=1-prev, size=alpha)
   ss <- (1-usebefore)*probtrans*prev*people/((1-usebefore)*probtrans*prev*people+N0*recrate)
 
-  if(plt==T){
+  if(plt==TRUE){
+par(las = 1)
     # plot stochastic result and deterministic steady state
     plot(TC/N0~t,type="l",ylim=c(0,3*ss),ylab="Proportion",xlab="Time (days)",
          main=paste("Prop. Contaminated Trays, ", round(ss,4), sep=''))
@@ -113,7 +118,9 @@ Having declared values we simulate and check steady state is reasonable proxy.
 delt <- 0.1
 contamtray <- sis_tray_sim(dt=delt, N0=TraysperLane, probtrans=probtransmissionpercontact, people=Customersperday/Lanes, prev=prevalence, recrate=recov)
 ```
-and after plotting check numerics 
+
+and after plotting check numerics
+
 ```{r modcomp}
 c(mean(contamtray$TC)/TraysperLane, mean(contamtray$caseinspite)/delt/Customersperday*Lanes, mean(contamtray$newcasefromtray)/delt/Customersperday*Lanes, mean(contamtray$reinfcase)/delt/Customersperday*Lanes)
 
@@ -161,7 +168,7 @@ RandomUptake$DeltaPCsame <- (1-RandomUptake$useprior)*(1-probtraycontaminated*Ra
 
 ggplot(data=RandomUptake)+
   geom_line(mapping=aes(x=useprior, y=DeltaPCsame))+xlab('Probability of use')+ylab('Probability of contamination')+
-  labs(title='Illustration with same probability of use before and after (rho=omega)')
+  labs(title='Illustration with same probability of use before and after\n(\u03C1 =\u03C9)') #rho = omega
 
 # Now allow independent sample of uptake before and after (still random no EPPM)
 RandomUptake$PC <- (1-RandomUptake$useprior)*(1-RandomUptake$usepost)*(1-probtraycontaminated*RandomUptake$useprior*eta)*PC00/(1-probtraycontaminated*RandomUptake$useprior)
@@ -175,8 +182,9 @@ RandomUptake$DeltaPCwq8 <- RandomUptake$usepost-RandomUptake$useprior+
 # equation 8
 
 ggplot(data=RandomUptake)+
-  geom_point(mapping=aes(x=useprior, y=DeltaPC))+xlab('Probability of use prior to contact')+ylab(TeX('$\\Delta P_C $'))+
-  labs(title='Relative change in contamination with random different probability of use \nboth before and after (eqn 5 of Walters et al)')
+  geom_point(mapping=aes(x=useprior, y=DeltaPC))+xlab('Probability of use before contact, \u03C1')+ylab(TeX('$\\Delta P_C $'))+
+  labs(title='Relative change in contamination with random different probability of use \nboth before and after (eqn 5 of Walters et al)') +
+  geom_hline(yintercept = 0, lty = 2)
 
 #plot((RandomUptake$useprior[which(RandomUptake$useprior>RandomUptake$usepost)]), RandomUptake$DeltaPC[which(RandomUptake$useprior>RandomUptake$usepost)])
 #plot((RandomUptake$useprior[which(RandomUptake$useprior<RandomUptake$usepost)]), RandomUptake$DeltaPC[which(RandomUptake$useprior<RandomUptake$usepost)])
@@ -214,14 +222,15 @@ Uptake$DeltaPCwq8 <- Uptake$usepost-Uptake$useprior+
   Uptake$useprior*probtraycontaminated*(1-eta)*(1-Uptake$useprior)/(1-probtraycontaminated*Uptake$useprior)
 # equation 8
 
-p1 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=usepost, y=DeltaPC))
-p2 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=useprior, y=DeltaPC))
-p3 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=efficacy, y=DeltaPC))
-p4 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=threat, y=DeltaPC))
+p1 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=usepost, y=DeltaPC)) + labs(y = expression("\u0394 P"["C"]), x = "Probability of use after contact, \u03C9")
+p2 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=useprior, y=DeltaPC)) + labs(y = expression("\u0394 P"["C"]), x = "Probability of use before contact, \u03C1")
+p3 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=efficacy, y=DeltaPC)) + labs(y = expression("\u0394 P"["C"]), x = "Efficacy \u03B5")
+p4 <- ggplot(data=Uptake)+geom_point(mapping = aes(x=threat, y=DeltaPC)) + labs(y = expression("\u0394 P"["C"]), x = "Threat, \u03C4")
 
 grid.arrange(p1, p2, p3, p4, ncol=2)
 
 ```
+
 These 4 plots, all showing $\Delta P_C$ on $y$-axis, critically all values are positive and so it is always better to place sanitiser after trays than before trays if resources are tight and cannot be placed in both locations in this situation.
 
 ## Hand hygiene chance not increasing with threat. (Section 3.2 of [Walters et al](https://www.medrxiv.org/content/10.1101/2021.07.16.21260521v1))
@@ -264,7 +273,8 @@ Uptake$DeltaPCwq8 <- Uptake$usepost-Uptake$useprior+
 
 ggplot(data=Uptake)+
      geom_contour_filled(mapping=aes(x=threat, y=efficacy, z=DeltaPC))+
-     geom_abline(intercept=0, slope=1, color='white', lwd=2)
+     geom_abline(intercept=0, slope=1, color='white', lwd=2) +
+  labs(x = "Threat, \u03C4", y = "Efficacy \u03B5", fill = expression("\u0394 P"["C"]))
 }
 
 ```
@@ -311,17 +321,21 @@ comp$critarea <- comp$eps - comp$tau*(1 - comp$tau+comp$eps)*comp$Phi
 
 p1 <- ggplot(data=comp)+
      geom_contour_filled(mapping=aes(y=eps, x=tau, z=rhoincrease))+
-  labs(title='Prob. of adherence \nbefore contact', x=TeX('$\\tau$'),y=TeX('$\\epsilon$'))
+  labs(title='Prob. of adherence \nbefore contact', x=TeX('Threat, $\\tau$'),y=TeX('Efficacy, $\\epsilon$'), fill = "") +
+  coord_fixed(ratio = 1)
 p2 <- ggplot(data=comp)+
      geom_contour_filled(mapping=aes(y=eps, x=tau, z=rhononincrease))+
-  labs(title='Prob. of adherence \nafter contact', x=TeX('$\\tau$'),y=TeX('$\\epsilon$'))
+  labs(title='Prob. of adherence \nafter contact', x=TeX('Threat, $\\tau$'),y=TeX('Efficacy, $\\epsilon$'), fill = "") +
+  coord_fixed(ratio = 1)
 p3 <- ggplot(data=comp)+
      geom_contour_filled(mapping=aes(y=eps, x=tau, z=Phi))+
-  labs(title=TeX('$\\Phi$'), x=TeX('$\\tau$'),y=TeX('$\\epsilon$'))
+  labs(title=TeX('$\\Phi$'), x=TeX('Threat, $\\tau$'),y=TeX('Efficacy, $\\epsilon$'), fill = "") +
+  coord_fixed(ratio = 1)
 p4 <- ggplot(data=comp)+
      geom_contour_filled(mapping=aes(y=eps, x=tau, z=critarea))+
      geom_abline(intercept=0, slope=1, color='white', lwd=2)+
-  labs(title='Critical Region', x=TeX('$\\tau$'),y=TeX('$\\epsilon$'))
+  labs(title='Critical Region', x=TeX('Threat, $\\tau$'),y=TeX('Efficacy, $\\epsilon$'), fill = "") +
+  coord_fixed(ratio = 1)
 ```
 
 Now plot results, firstly just plot back the probability of uptake of sansitiser given efficacy and threat.
